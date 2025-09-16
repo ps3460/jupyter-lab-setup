@@ -67,4 +67,5 @@ systemctl start jupyter.service
 echo -e "\n🎉 All done! Your Raspberry Pi is set up."
 echo "Jupyter Lab is running as a service and will start on boot."
 echo "You can check its status with: sudo systemctl status jupyter.service"
-echo "Next steps are in the instructions below."
+
+echo ip a
