@@ -1,16 +1,18 @@
 #!/bin/bash
 
 # A script to set up a Raspberry Pi 5 for a CNN project
-# with Jupyter Lab running as a service.
+# with Jupyter Lab running as a service. (v2 - Corrected User Detection)
 
 # --- Configuration ---
+# NOTE: The PROJECT_DIR is now built using the reliable $SUDO_USER variable
 VENV_NAME="cats_vs_dogs"
-PROJECT_DIR="/home/$(whoami)/projects"
+PROJECT_DIR="/home/$SUDO_USER/projects"
 
-# Ensure the script is run with sudo, but some commands as the user
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run this script with sudo: sudo ./setup_project.sh"
-  exit
+# Ensure the script is run with sudo from a regular user account
+if [ "$EUID" -ne 0 ] || [ -z "$SUDO_USER" ]; then
+  echo "Error: Please run this script from a regular user account using sudo."
+  echo "Example: sudo ./setup_project.sh"
+  exit 1
 fi
 
 # Step 1: Update and Upgrade System Packages
@@ -22,14 +24,12 @@ echo "🛠️ Step 2: Installing system dependencies (Python, Git, etc.)..."
 apt-get install -y python3-pip python3-venv git libatlas-base-dev
 
 # Step 3: Create Project Directory and Virtual Environment (as the original user)
-echo "📁 Step 3: Creating project directory and Python virtual environment..."
-SUDO_USER=$(who -m | awk '{print $1;}')
+echo "📁 Step 3: Creating project directory and Python virtual environment for user '$SUDO_USER'..."
 sudo -u $SUDO_USER mkdir -p $PROJECT_DIR
 sudo -u $SUDO_USER python3 -m venv $PROJECT_DIR/$VENV_NAME
 
 # Step 4: Install Python Packages into the Virtual Environment
 echo "🐍 Step 4: Installing Python packages (Jupyter, TFLite, Kaggle)..."
-# The command is run inside a subshell to avoid changing the current shell's environment
 sudo -u $SUDO_USER bash -c "source $PROJECT_DIR/$VENV_NAME/bin/activate && \
 pip install --upgrade pip && \
 pip install jupyterlab tflite-runtime kaggle kagglehub numpy Pillow matplotlib"
@@ -64,8 +64,8 @@ systemctl daemon-reload
 systemctl enable jupyter.service
 systemctl start jupyter.service
 
-echo -e "\n🎉 All done! Your Raspberry Pi is set up."
-echo "Jupyter Lab is running as a service and will start on boot."
-echo "You can check its status with: sudo systemctl status jupyter.service"
 
-echo ip a
+sudo systemctl status jupyter.service
+
+echo -e "\n🎉 All done! Your Raspberry Pi is set up."
+
