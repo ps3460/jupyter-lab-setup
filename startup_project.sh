@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# A script to set up a Raspberry Pi 5 for a CNN project
-# with Jupyter Lab running as a service. (v2 - Corrected User Detection)
+# A script to set up a Debian server for a CNN project
+# with Jupyter Lab running as a service. (v3 - Debian Trixie Fix)
 
 # --- Configuration ---
-# NOTE: The PROJECT_DIR is now built using the reliable $SUDO_USER variable
 VENV_NAME="cats_vs_dogs"
 PROJECT_DIR="/home/$SUDO_USER/projects"
 
@@ -21,7 +20,8 @@ apt-get update && apt-get full-upgrade -y
 
 # Step 2: Install System Dependencies
 echo "🛠️ Step 2: Installing system dependencies (Python, Git, etc.)..."
-apt-get install -y python3-pip python3-venv git libatlas-base-dev
+# MODIFIED: Changed package names for Debian Trixie compatibility
+apt-get install -y python3-pip python3-venv python3.13-venv git libopenblas-dev
 
 # Step 3: Create Project Directory and Virtual Environment (as the original user)
 echo "📁 Step 3: Creating project directory and Python virtual environment for user '$SUDO_USER'..."
@@ -37,10 +37,8 @@ pip install jupyterlab tflite-runtime kaggle kagglehub numpy Pillow matplotlib"
 # Step 5: Configure and Enable Jupyter Lab as a systemd Service
 echo "⚙️ Step 5: Setting up Jupyter Lab to run as a service..."
 
-# Define the full path to the jupyter executable in the venv
 JUPYTER_EXEC="$PROJECT_DIR/$VENV_NAME/bin/jupyter-lab"
 
-# Create the systemd service file
 cat <<EOF > /etc/systemd/system/jupyter.service
 [Unit]
 Description=Jupyter Lab Server for $SUDO_USER
@@ -65,7 +63,7 @@ systemctl enable jupyter.service
 systemctl start jupyter.service
 
 
-sudo systemctl status jupyter.service
+systemctl status jupyter.service
 
-echo -e "\n🎉 All done! Your Raspberry Pi is set up."
-
+echo -e "\n🎉 All done! Your server is set up."
+echo "Jupyter Lab is running as a service and will start on boot."
