@@ -55,7 +55,6 @@ echo "Project environment will be created at: $PROJECT_VENV_PATH"
 
 # Step 2: Install System Dependencies & Create Swap File
 echo "🚀 Step 2: Installing system dependencies..."
-apt-get update && apt-get full-upgrade -y
 apt-get install -y python3-pip python3-full git libopenblas-dev
 
 echo "💾 Creating and enabling a 4GB swap file for stability..."
