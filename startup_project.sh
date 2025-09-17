@@ -124,6 +124,6 @@ sudo -u $SUDO_USER rm -rf "$PIP_TMP_DIR"
 
 echo -e "\n🎉 All done! Your Jupyter Lab server is ready."
 echo "It is running from its own environment, and your project kernel '$VENV_NAME' is available."
-
+hostname -I
 ~/jupyter_env/bin/jupyter server list
 
