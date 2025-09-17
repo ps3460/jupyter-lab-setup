@@ -7,7 +7,7 @@ A training CNN using cat vs dogs
 sudo apt update ; sudo apt upgrade -y
 sudo apt install git -y
 
-sudo git clone 
+sudo git clone https://github.com/ps3460/cats-vs-dogs.git
 
 ```
 sudo chmod +x startup_project.sh 
