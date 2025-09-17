@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # A script to set up a Debian server with a central Jupyter Lab
-# and project-specific, selectable kernels.
+# running from its own dedicated venv.
 
 # --- Configuration ---
-# The project directory where all venvs will be stored.
-PROJECT_DIR="/home/$SUDO_USER/projects"
+PROJECTS_DIR="/home/$SUDO_USER/projects"
+JUPYTER_VENV_PATH="/home/$SUDO_USER/jupyter_env"
 
 # Ensure the script is run with sudo from a regular user account
 if [ "$EUID" -ne 0 ] || [ -z "$SUDO_USER" ]; then
   echo "Error: Please run this script from a regular user account using sudo."
-  echo "Example: sudo ./setup_project.sh"
+  echo "Example: sudo ./setup.sh"
   exit 1
 fi
 
@@ -19,56 +19,50 @@ echo "🚀 Step 1: Installing system dependencies..."
 apt-get update && apt-get full-upgrade -y
 apt-get install -y python3-pip python3-full git libopenblas-dev
 
-# Step 2: Install Jupyter Lab for the main user
-echo "💻 Step 2: Installing Jupyter Lab for user '$SUDO_USER'..."
-sudo -u $SUDO_USER pip install --user --upgrade pip
-sudo -u $SUDO_USER pip install --user jupyterlab
+# Step 2: Create and Install Jupyter Lab in its own Venv
+echo "💻 Step 2: Creating a dedicated environment for Jupyter Lab..."
+sudo -u $SUDO_USER python3 -m venv "$JUPYTER_VENV_PATH"
 
-# Ensure the user's local bin is in their PATH for future terminal sessions
-BASHRC_PATH="/home/$SUDO_USER/.bashrc"
-if ! grep -q "$HOME/.local/bin" "$BASHRC_PATH"; then
-    echo "Adding ~/.local/bin to PATH in .bashrc"
-    echo '' >> $BASHRC_PATH
-    echo '# Add user\'s local bin to PATH' >> $BASHRC_PATH
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> $BASHRC_PATH
-fi
+echo "Installing Jupyter Lab into its environment..."
+sudo -u $SUDO_USER bash -c "source \"$JUPYTER_VENV_PATH/bin/activate\" && \
+pip install --upgrade pip && \
+pip install jupyterlab"
 
 # Step 3: Get Project Details from User
-echo -e "\n📝 Step 3: Please name your new project environment."
+echo -e "\n📝 Step 3: Now, let's create a separate environment for your project."
 echo "   (e.g., 'cats_vs_dogs', 'data_analysis', etc.)"
 VENV_NAME=""
 while [ -z "$VENV_NAME" ]; do
-    read -p "Enter a name for the virtual environment: " VENV_NAME
+    read -p "Enter a name for the project's virtual environment: " VENV_NAME
 done
-VENV_PATH="$PROJECT_DIR/$VENV_NAME"
-echo "Virtual environment will be created at: $VENV_PATH"
+PROJECT_VENV_PATH="$PROJECTS_DIR/$VENV_NAME"
+echo "Project environment will be created at: $PROJECT_VENV_PATH"
 
-# Step 4: Create Venv and Install Project Dependencies + Kernel
-echo "🐍 Step 4: Creating venv and installing project packages..."
-sudo -u $SUDO_USER mkdir -p $PROJECT_DIR
-sudo -u $SUDO_USER python3 -m venv $VENV_PATH
+# Step 4: Create Project Venv and Register it as a Kernel
+echo "🐍 Step 4: Creating project venv and installing packages..."
+sudo -u $SUDO_USER mkdir -p "$PROJECTS_DIR"
+sudo -u $SUDO_USER python3 -m venv "$PROJECT_VENV_PATH"
 
-echo "Installing ipykernel and other packages into '$VENV_NAME'..."
-sudo -u $SUDO_USER bash -c "source $VENV_PATH/bin/activate && \
+echo "Installing project packages and registering the kernel..."
+sudo -u $SUDO_USER bash -c "source \"$PROJECT_VENV_PATH/bin/activate\" && \
 pip install --upgrade pip && \
 pip install ipykernel tensorflow opencv-python matplotlib kaggle kagglehub numpy Pillow && \
 python -m ipykernel install --user --name=\"$VENV_NAME\" --display-name=\"Python ($VENV_NAME)\""
 
-# Step 5: Set up the main Jupyter Lab service
-echo "⚙️ Step 5: Setting up the main Jupyter Lab service..."
-JUPYTER_EXEC="/home/$SUDO_USER/.local/bin/jupyter-lab"
+# Step 5: Set up the Jupyter Lab Service
+echo "⚙️ Step 5: Setting up the Jupyter Lab service..."
+JUPYTER_EXEC="$JUPYTER_VENV_PATH/bin/jupyter-lab"
 
 cat <<EOF > /etc/systemd/system/jupyter.service
 [Unit]
-Description=Jupyter Lab Server (Central Hub) for $SUDO_USER
+Description=Jupyter Lab Server (from $JUPYTER_VENV_PATH)
 After=network.target
 
 [Service]
 Type=simple
 User=$SUDO_USER
-# We now run the user's main jupyter-lab, not one from a venv
-ExecStart=$JUPYTER_EXEC --no-browser --ip=0.0.0.0 --notebook-dir=$PROJECT_DIR
-WorkingDirectory=$PROJECT_DIR
+ExecStart=$JUPYTER_EXEC --no-browser --ip=0.0.0.0 --notebook-dir=$PROJECTS_DIR
+WorkingDirectory=$PROJECTS_DIR
 Restart=always
 RestartSec=10
 
@@ -82,6 +76,5 @@ systemctl daemon-reload
 systemctl enable jupyter.service
 systemctl restart jupyter.service
 
-echo -e "\n🎉 All done! Your server is set up with the Central Hub model."
-echo "You can check the service status with: sudo systemctl status jupyter.service"
-echo "Your new kernel '$VENV_NAME' is now available in Jupyter Lab."
+echo -e "\n🎉 All done! Your Jupyter Lab server is ready."
+echo "It is running from its own environment, and your project kernel '$VENV_NAME' is available."
