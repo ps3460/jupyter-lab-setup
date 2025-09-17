@@ -30,7 +30,7 @@ pip install jupyterlab"
 
 # Step 3: Get Project Details from User
 echo -e "\n📝 Step 3: Now, let's create a separate environment for your project."
-echo "   (e.g., 'cats_vs_dogs', 'data_analysis', etc.)"
+echo "   (e.g., 'venv-01', 'data_analysis', 'cnn-ai' etc.)"
 VENV_NAME=""
 while [ -z "$VENV_NAME" ]; do
     read -p "Enter a name for the project's virtual environment: " VENV_NAME
