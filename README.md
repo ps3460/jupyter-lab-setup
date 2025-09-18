@@ -1,7 +1,4 @@
-# cats-vs-dogs
-A training CNN using cat vs dogs
-
-# Push to set up the raspberry Pi
+# Set up Jupyter Lab on linux
 
 ```
 sudo apt update ; sudo apt upgrade -y
