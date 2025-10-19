@@ -23,19 +23,20 @@ echo "   V:::::V         V:::::V E:::::::::::::::E N::::::::N      N::::::N  V::
 echo "    V:::::V       V:::::V E:::::EEEEEEEEEEC  N:::::::::N     N::::::N   V:::::V        V:::::V   "
 echo "     V:::::V     V:::::V E:::::E             N::::::::::N    N::::::N    V:::::V      V:::::V    "
 echo "      V:::::V   V:::::V E:::::E              N:::::::::::N   N::::::N     V:::::V    V:::::V     "
-echo "       V:::::V V:::::V E:::::EEEEEEEEEEC     N::::N:::::::N  N::::::N      V:::::V  V:::::V      "
-echo "        V:::::::::V E:::::::::::::::E        N::::N N:::::::N N:::::N       V:::::V V:::::V       "
-echo "         V:::::::V E::::::::::::EEE          N::::N  N:::::::N::::::N        V:::::::::V        "
-echo "          V:::::V EEEEEEEEEEEEEEE            N::::N   N::::::::::::N           V:::::::V         "
-echo "           V:::V                             N::::N    N:::::::::::N            V:::::V          "
-echo "            V:V                              NNNNNN     NNNNNNNNNNNN             V:::V           "
+echo "       V:::::V V:::::V E:::::EEEEEEEEEEC      N::::N:::::::N  N::::::N      V:::::V  V:::::V      "
+echo "        V:::::::::V E:::::::::::::::E       N::::N N:::::::N N::::::N       V:::::V V:::::V       "
+echo "         V:::::::V E::::::::::::EEE        N::::N  N:::::::N::::::N        V:::::::::V        "
+echo "          V:::::V EEEEEEEEEEEEEEE         N::::N   N::::::::::::N           V:::::::V         "
+echo "           V:::V                          N::::N    N:::::::::::N            V:::::V          "
+echo "            V:V                           NNNNNN     NNNNNNNNNNNN             V:::V           "
 echo -e "\033[0m"
 echo -e "\033[1;32m--- Jupyter Lab & Project Environment Setup Script ---\033[0m"
 echo "This script will first ask for your project name, then:"
 echo "1. Install dependencies and create a 4GB swap file."
 echo "2. Set up a dedicated, central environment for Jupyter Lab."
 echo "3. Create your named project environment."
-echo "4. Register your project environment as a kernel in Jupyter Lab."
+echo "4. Optionally clone a Git repo and copy a specific notebook."
+echo "5. Configure the firewall and start the Jupyter service."
 echo "----------------------------------------------------"
 sleep 2
 
@@ -73,8 +74,9 @@ sleep 1
 
 # --- Step 2: Install System Dependencies & Create Swap File (Requires Root) ---
 echo -e "\n🚀 Step 2: Installing system dependencies (requires root)..."
+# Add ufw to the list of packages to install
 apt-get update && apt-get full-upgrade -y
-apt-get install -y python3-pip python3-full git libopenblas-dev
+apt-get install -y python3-pip python3-full git libopenblas-dev ufw
 
 if [ ! -f /swapfile ]; then
     echo "💾 Creating and enabling a 4GB swap file for stability..."
@@ -117,11 +119,47 @@ pip install ipykernel tensorflow opencv-python matplotlib kaggle kagglehub numpy
 python -m ipykernel install --user --name=\"$VENV_NAME\" --display-name=\"Python ($VENV_NAME)\""
 
 
-# --- Step 5: Set up Jupyter Lab Service (Requires Root) ---
-echo -e "\n⚙️ Step 5: Setting up the Jupyter Lab systemd service..."
+# --- Step 5: Clone Git Repository and Copy Notebook (As User) ---
+echo -e "\n📂 Step 5: Clone a Git repository (optional)."
+read -p "Enter the Git repository URL to clone (or press Enter to skip): " GIT_REPO_URL
+
+if [ -n "$GIT_REPO_URL" ]; then
+    # Create a unique name for the clone directory based on the repo URL
+    CLONE_DIR_NAME=$(basename "$GIT_REPO_URL" .git)
+    CLONE_PATH="$PROJECTS_DIR/$CLONE_DIR_NAME"
+
+    echo "Cloning into '$CLONE_PATH'..."
+    # Run the clone as the user to ensure correct ownership
+    sudo -u "$CURRENT_USER" git clone "$GIT_REPO_URL" "$CLONE_PATH"
+
+    # Now, find and copy the specific notebook
+    echo "Searching for 'cat-vd-dog.ipynb' in the cloned repository..."
+    # Use find to locate the file, -print to show path, -quit to stop after first match
+    NOTEBOOK_PATH=$(find "$CLONE_PATH" -name "cat-vd-dog.ipynb" -print -quit)
+
+    if [ -n "$NOTEBOOK_PATH" ]; then
+        echo "✅ Found notebook. Copying to the main projects directory..."
+        sudo -u "$CURRENT_USER" cp "$NOTEBOOK_PATH" "$PROJECTS_DIR/"
+        echo "Notebook 'cat-vd-dog.ipynb' is now available in your Jupyter Lab projects folder."
+    else
+        echo "⚠️  Warning: Could not find 'cat-vd-dog.ipynb' in the repository."
+        echo "The full repository has been cloned into the '$CLONE_DIR_NAME' folder for you to access."
+    fi
+else
+    echo "Skipping Git clone."
+fi
+
+
+# --- Step 6: Configure Firewall and Set up Service (Requires Root) ---
+echo -e "\n⚙️ Step 6: Configuring firewall and setting up Jupyter Lab service..."
+
+echo "🔥 Configuring firewall to allow Jupyter traffic on port 8888..."
+ufw allow 8888/tcp
+# The --force flag enables ufw without a y/n prompt
+ufw --force enable
+
 # The service definition needs to be created by root
 JUPYTER_EXEC="$JUPYTER_VENV_PATH/bin/jupyter-lab"
-
 cat <<EOF > /etc/systemd/system/jupyter.service
 [Unit]
 Description=Jupyter Lab Server (for user $CURRENT_USER)
@@ -146,17 +184,26 @@ systemctl daemon-reload
 systemctl enable jupyter.service
 systemctl restart jupyter.service
 
+# Add a short delay to allow the service to initialize before we check its status
+sleep 3
 
-# --- Step 6: Final Cleanup and Instructions ---
+
+# --- Step 7: Final Cleanup and Instructions ---
 echo "🧹 Cleaning up temporary pip directory..."
 sudo -u "$CURRENT_USER" rm -rf "$PIP_TMP_DIR"
+
+echo -e "\n📊 Checking the status of the Jupyter service..."
+# --no-pager shows the full output without needing to scroll, -l shows full lines
+systemctl status jupyter.service --no-pager -l
 
 # Get the server's primary IP address to show the user
 IP_ADDR=$(hostname -I | awk '{print $1}')
 
-echo -e "\n\033[1;32m🎉 All done! Your Jupyter Lab server is ready.\033[0m"
+echo -e "\n\033[1;32m🎉 All done! Your Jupyter Lab server should be ready.\033[0m"
 echo "You can access it at: \033[1mhttp://$IP_ADDR:8888\033[0m"
 echo "Your project kernel '$VENV_NAME' is available inside Jupyter Lab."
-echo -e "\nTo get the login token, run the following command \033[1mas your regular user\033[0m (not as root):"
-echo -e "\033[1;33m$USER_HOME/jupyter_env/bin/jupyter server list\033[0m"
+echo -e "\nTo get the login token, copy and paste the following command as your regular user:"
 echo "----------------------------------------------------------------"
+echo -e "  \033[1;33m~/jupyter_env/bin/jupyter server list\033[0m"
+echo "----------------------------------------------------------------"
+
