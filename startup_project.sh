@@ -126,5 +126,6 @@ echo -e "\n🎉 All done! Your Jupyter Lab server is ready."
 echo "It is running from its own environment, and your project kernel '$VENV_NAME' is available."
 hostname -I
 pause 3
+echo "Run this line:"
 echo "~/jupyter_env/bin/jupyter server list"
 
